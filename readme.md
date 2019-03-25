@@ -44,7 +44,7 @@ Run this to auto deploy as you save changes (or add it to a package.json script)
 $ node <FILE-WITH-CODE-ABOVE>.js
 ```
 
-Don't hesitate to contact me with questions or issues
+#### If you encounter an error report it [here](https://github.com/olivermarkrichman/ec2-deploy/issues/new)
 
 
 ##### Extra Details if you're using this to host a LAMP server with EC2:
