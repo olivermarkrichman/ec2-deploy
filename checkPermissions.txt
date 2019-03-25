@@ -1,1 +1,0 @@
-This file is to check if the user can upload files.

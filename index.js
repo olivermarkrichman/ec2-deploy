@@ -235,7 +235,6 @@ function cmd(cmd, dataCB) {
 				if (err) throw err;
 				stream.on('close', function (code, signal) { conn.end(); })
 					.on('data', function (data) {
-						// 	dataCB(String(data).split(/\r?\n/));
 						dataCB(String(data));
 					})
 					.stderr.on('data', function (data) {
