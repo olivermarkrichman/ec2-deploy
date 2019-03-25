@@ -1,0 +1,26 @@
+{
+	"name": "ec2-deploy",
+	"version": "2.0.0",
+	"description": "Easily Deploy files to an AWS EC2 instance.",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"keywords": [
+		"deploy",
+		"ec2",
+		"aws",
+		"php",
+		"api",
+		"upload",
+		"transfer",
+		"scp"
+	],
+	"author": "Oliver Richman",
+	"license": "ISC",
+	"dependencies": {
+		"scp2": "^0.5.0",
+		"ssh2": "^0.8.2",
+		"gulp": "^4.0.0"
+	}
+}

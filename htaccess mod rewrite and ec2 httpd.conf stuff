@@ -1,0 +1,16 @@
+// CHANGE Directory /var/www/html in HTTPD.CONF to
+// <Directory /var/www/html>
+//     Options Indexes FollowSymLinks
+//     Require all granted
+//     AllowOverride All
+// </Directory>
+
+// HTACCESS FOR API URL REWRITE!
+// <IfModule mod_rewrite.c>
+// RewriteEngine On
+// RewriteBase /
+// RewriteRule ^index\.php$ - [L]
+// RewriteCond %{REQUEST_FILENAME} !-f
+// RewriteCond %{REQUEST_FILENAME} !-d
+// RewriteRule . /index.php [L]
+// </IfModule>
