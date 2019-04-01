@@ -54,31 +54,14 @@ exports.setConfig = function (userConfig) {
 }
 
 function checkPermissions() {
-	log(`Checking ${config.username} has the correct permissions on ${config.host} for ${config.remotePath} directory`)
-	fs.writeFile(
-		'permission-check.txt',
-		`This file is used by Mezaria's EC2-Deploy Package to check if you can upload files using the config details provided. Feel free to delete this file.`,
-		(err) => {
-			if (!err) {
-				scpClient.scp('./permission-check.txt', {
-					host: config.host,
-					username: config.username,
-					password: config.password,
-					path: config.remotePath
-				}, function (err) {
-					if (err) {
-						error(`The configuration details you've set are incorrect, please change and try again`);
-					} else {
-						cmd('rm -rf ' + config.remotePath + '/permission-check.txt', () => {}); //Remove Perm-chk file from server.
-						fs.unlink('permission-check.txt', (err) => { if (err) { error(err); } }); //Remove local Perm-chk file.
-						success(`${config.username} is authorised!`);
-					}
-				});
-			} else {
-				error(err);
-			}
+	log(`Checking ${config.username} has the correct permissions on ${config.host} for ${config.remotePath} directory`);
+	cmd('ls -ld ' + config.remotePath, data => {
+		if (data.startsWith('drwxr')) {
+			success(`${config.username} is authorised!`);
+		} else {
+			error(`The configuration details you've set are incorrect, please change and try again`);
 		}
-	)
+	});
 }
 
 exports.getConfig = function () {
@@ -104,6 +87,7 @@ function refreshDirectory(directory, cb) {
 			log('Removed existing files in ' + config.remotePath);
 			fs.readdirSync(directory).forEach(file => {
 				if (file[0] === '.') {
+					warn(file);
 					scpClient.scp(directory + file, scpInfo, function (err) {
 						if (err) {
 							error(err);
@@ -150,13 +134,15 @@ function watchAndDeploy(directory) {
 	});
 }
 
-function setRemoteDirectory() {
+function setRemoteDirectory(cb) {
 	cmd('file ' + config.remotePath, data => {
 		if (data.includes(config.remotePath + ': setgid directory')) {
-			return true;
+			cb();
+		} else if (data.includes(config.remotePath + ': cannot open (No such file or directory)')) {
+			cmd('mkdir ' + config.remotePath, data => {});
+			setRemoteDirectory();
 		} else {
 			cmd('rm -rf ' + config.remotePath, data => {});
-			cmd('mkdir ' + config.remotePath, data => {});
 			setRemoteDirectory();
 		}
 	});
@@ -168,20 +154,20 @@ exports.autoDeploy = function (directory, reload = false) {
 	}
 
 	setTimeout(function () {
-		setRemoteDirectory();
-		if (reload) {
-			warn(`You've set 'reload' to true in your autoDeploy() call. If you did not want to do this then exit now. Otherwise please wait.`);
-			log('\x1b[1m' + 'EXIT NOW IF YOU DO NOT WANT TO UPLOAD THE CONTENTS OF: ' + directory);
-			setTimeout(function () {
-				refreshDirectory(directory, function () {
-					watchAndDeploy(directory);
-				});
+		setRemoteDirectory(() => {
+			if (reload) {
+				warn(`You've set 'reload' to true in your autoDeploy() call. If you did not want to do this then exit now. Otherwise please wait.`);
+				log('\x1b[1m' + 'EXIT NOW IF YOU DO NOT WANT TO UPLOAD THE CONTENTS OF: ' + directory);
+				setTimeout(function () {
+					refreshDirectory(directory, function () {
+						watchAndDeploy(directory);
+					});
+				}, reloadWaitTime);
+			} else {
+				watchAndDeploy(directory);
+			}
+		})
 
-
-			}, reloadWaitTime);
-		} else {
-			watchAndDeploy(directory);
-		}
 	}, 2500);
 }
 
