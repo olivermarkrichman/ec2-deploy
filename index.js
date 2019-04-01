@@ -10,6 +10,7 @@ let config = {
 }
 
 let reloadWaitTime = 15000;
+// reloadWaitTime = 15;
 
 const deployerTag = '\x1b[106m' + '\x1b[30m' + '[Mezaria-Deployer]' + '\x1b[0m' + ' ~ ';
 
@@ -89,26 +90,39 @@ exports.reload = function (directory) {
 }
 
 function refreshDirectory(directory, cb) {
+	let scpInfo = {
+		host: config.host,
+		username: config.username,
+		password: config.password,
+		path: config.remotePath
+	};
 	warn('Preparing to refresh ' + config.remotePath + ' with contents of ' + directory);
 	cmd('rm -rf ' + config.remotePath + '/*', data => {});
+	cmd('rm -rf ' + config.remotePath + '/.*', data => {}, false);
 	cmd('[ "$(ls -A ' + config.remotePath + ')" ] && echo 1 || echo 0', data => {
 		if (!Number(data)) {
 			log('Removed existing files in ' + config.remotePath);
-			scpClient.scp(directory, {
-				host: config.host,
-				username: config.username,
-				password: config.password,
-				path: config.remotePath
-			}, function (err) {
-				if (err) {
-					error(err);
-				} else {
-					success(`Reloaded ${directory} in ${config.remotePath}`);
-					cb();
+			fs.readdirSync(directory).forEach(file => {
+				if (file[0] === '.') {
+					scpClient.scp(directory + file, scpInfo, function (err) {
+						if (err) {
+							error(err);
+						} else {
+							scpClient.scp(directory, scpInfo, function (err) {
+								if (err) {
+									error(err);
+								} else {
+									success('Reloaded!');
+									cb();
+								}
+							});
+						}
+					});
 				}
 			});
 		} else {
 			error('Failed to remove existing files on ' + config.remotePath);
+			cb();
 		}
 	});
 }
@@ -163,10 +177,11 @@ function returnFileName(path) {
 }
 
 function returnFilePath(path, dirPath = false) {
+	let mainDir = path.split('/')[0];
 	if (dirPath) {
-		return path.split('api')[1]
+		return path.split(mainDir)[1]
 	} else {
-		return path.split('api')[1].replace(returnFileName(path), '');
+		return path.split(mainDir)[1].replace(returnFileName(path), '');
 	}
 }
 
@@ -183,6 +198,7 @@ function uploadFile(path) {
 		if (err) {
 			error(err);
 		} else {
+
 			success(`Uploaded ${fileName} to ${config.host} (${new Date().toLocaleTimeString()})`);
 		}
 	});
@@ -203,11 +219,11 @@ function createFolder(path) {
 
 function deleteFile(path) {
 	let fileName = returnFileName(path);
-	let filePath = path.split('api')[1].replace(returnFileName(path), '');
+	let filePath = returnFilePath(path);
 	log('Deleting ' + fileName);
 	cmd('rm -rf ' + config.remotePath + filePath + fileName, data => {});
 	cmd('test -f  ' + config.remotePath + filePath + fileName + ' && echo true || echo false', data => {
-		if (!data[0]) {
+		if (!Number(data)) {
 			success('Deleted ' + fileName);
 		} else {
 			error('Failed to delete ' + fileName);
@@ -228,7 +244,7 @@ function deleteFolder(path) {
 	})
 }
 
-function cmd(cmd, dataCB) {
+function cmd(cmd, dataCB, showErr = true) {
 	let conn = new ssh.Client();
 	conn.on('ready', function () {
 			conn.exec(cmd, function (err, stream) {
@@ -238,7 +254,7 @@ function cmd(cmd, dataCB) {
 						dataCB(String(data));
 					})
 					.stderr.on('data', function (data) {
-						error(data);
+						if (showErr) { error(data); }
 					});
 			});
 		})
