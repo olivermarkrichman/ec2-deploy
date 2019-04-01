@@ -1,6 +1,6 @@
 {
 	"name": "ec2-deploy",
-	"version": "2.1.0",
+	"version": "2.1.1",
 	"description": "Easily Deploy files to an AWS EC2 instance.",
 	"main": "index.js",
 	"scripts": {
