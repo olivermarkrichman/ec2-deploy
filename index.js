@@ -127,35 +127,48 @@ function refreshDirectory(directory, cb) {
 	});
 }
 
+function watchAndDeploy(directory) {
+	log(`Watching ${directory} for changes...`);
+	gulp.watch(directory).on('all', function (event, path) {
+		switch (event) {
+		case 'add':
+			uploadFile(path);
+			break;
+		case 'addDir':
+			createFolder(path);
+			break;
+		case 'change':
+			uploadFile(path);
+			break;
+		case 'unlink':
+			deleteFile(path);
+			break;
+		case 'unlinkDir':
+			deleteFolder(path);
+			break;
+		}
+	});
+}
+
+function setRemoteDirectory() {
+	cmd('file ' + config.remotePath, data => {
+		if (data.includes(config.remotePath + ': setgid directory')) {
+			return true;
+		} else {
+			cmd('rm -rf ' + config.remotePath, data => {});
+			cmd('mkdir ' + config.remotePath, data => {});
+			setRemoteDirectory();
+		}
+	});
+}
+
 exports.autoDeploy = function (directory, reload = false) {
 	if (directory.substr(directory.length - 1) !== '/') {
 		directory += '/';
 	}
 
-	const watchAndDeploy = (directory) => {
-		log(`Watching ${directory} for changes...`);
-		gulp.watch(directory).on('all', function (event, path) {
-			switch (event) {
-			case 'add':
-				uploadFile(path);
-				break;
-			case 'addDir':
-				createFolder(path);
-				break;
-			case 'change':
-				uploadFile(path);
-				break;
-			case 'unlink':
-				deleteFile(path);
-				break;
-			case 'unlinkDir':
-				deleteFolder(path);
-				break;
-			}
-		});
-	};
-
 	setTimeout(function () {
+		setRemoteDirectory();
 		if (reload) {
 			warn(`You've set 'reload' to true in your autoDeploy() call. If you did not want to do this then exit now. Otherwise please wait.`);
 			log('\x1b[1m' + 'EXIT NOW IF YOU DO NOT WANT TO UPLOAD THE CONTENTS OF: ' + directory);
