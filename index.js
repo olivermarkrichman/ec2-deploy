@@ -3,6 +3,8 @@ const scpClient = require('scp2');
 const gulp = require('gulp');
 const fs = require('fs');
 const fg = require('fast-glob');
+const readline = require('readline');
+
 let config = {
 	host: '',
 	username: '',
@@ -10,10 +12,14 @@ let config = {
 	remotePath: ''
 }
 
-let reloadWaitTime = 15000;
-reloadWaitTime = 15;
+let authorised = false;
 
-const deployerTag = '\x1b[106m' + '\x1b[30m' + '[Mezaria-Deployer]' + '\x1b[0m' + ' ~ ';
+const rl = readline.createInterface({
+	input: process.stdin,
+	output: process.stdout
+});
+
+const deployerTag = '\x1b[1m' + '[MD]' + '\x1b[0m' + ' ~ ';
 
 function error(msg) {
 	console.log(deployerTag + '\x1b[1m' + '\x1b[31m' + 'ERROR:' + msg, '\x1b[0m');
@@ -51,14 +57,14 @@ exports.setConfig = function (userConfig) {
 	if (config.remotePath.substr(config.remotePath.length - 1) === '/') {
 		config.remotePath = config.remotePath.substring(0, config.remotePath.length - 1);
 	}
-	checkPermissions();
 }
 
-function checkPermissions() {
+function checkPermissions(cb) {
 	log(`Checking ${config.username} has the correct permissions on ${config.host} for ${config.remotePath} directory`);
 	cmd('ls -ld ' + config.remotePath, data => {
 		if (data.startsWith('drwxr')) {
 			success(`${config.username} is authorised!`);
+			cb();
 		} else {
 			error(`The configuration details you've set are incorrect, please change and try again`);
 		}
@@ -80,7 +86,7 @@ function refreshDirectory(directory, cb) {
 		password: config.password,
 		path: config.remotePath
 	};
-	warn('Preparing to refresh ' + config.remotePath + ' with contents of ' + directory);
+	warn('Preparing to refresh...');
 	cmd('rm -rf ' + config.remotePath + '/*', data => {});
 	cmd('rm -rf ' + config.remotePath + '/.*', data => {}, false);
 	cmd('[ "$(ls -A ' + config.remotePath + ')" ] && echo 1 || echo 0', data => {
@@ -165,23 +171,25 @@ exports.autoDeploy = function (directory, reload = false) {
 	if (directory.substr(directory.length - 1) !== '/') {
 		directory += '/';
 	}
-
-	setTimeout(function () {
+	checkPermissions(() => {
 		setRemoteDirectory(() => {
 			if (reload) {
-				warn(`You've set 'reload' to true in your autoDeploy() call. If you did not want to do this then exit now. Otherwise please wait.`);
-				log('\x1b[1m' + 'EXIT NOW IF YOU DO NOT WANT TO UPLOAD THE CONTENTS OF: ' + directory);
-				setTimeout(function () {
-					refreshDirectory(directory, function () {
-						watchAndDeploy(directory);
-					});
-				}, reloadWaitTime);
+				log('\x1b[1m' + 'EXIT NOW IF YOU DO NOT WANT TO RELOAD ' + config.remotePath);
+				rl.question(deployerTag + 'Press enter if you would like to continue.' + '\x1b[0m', (answer) => {
+					if (!answer.length) {
+						refreshDirectory(directory, function () {
+							watchAndDeploy(directory);
+						});
+					} else {
+						return;
+					}
+					rl.close();
+				});
 			} else {
 				watchAndDeploy(directory);
 			}
-		})
-
-	}, 2500);
+		});
+	});
 }
 
 function returnFileName(path) {
