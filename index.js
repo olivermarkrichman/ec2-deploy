@@ -2,6 +2,7 @@ const ssh = require('ssh2');
 const scpClient = require('scp2');
 const gulp = require('gulp');
 const fs = require('fs');
+const fg = require('fast-glob');
 let config = {
 	host: '',
 	username: '',
@@ -10,7 +11,7 @@ let config = {
 }
 
 let reloadWaitTime = 15000;
-// reloadWaitTime = 15;
+reloadWaitTime = 15;
 
 const deployerTag = '\x1b[106m' + '\x1b[30m' + '[Mezaria-Deployer]' + '\x1b[0m' + ' ~ ';
 
@@ -85,25 +86,37 @@ function refreshDirectory(directory, cb) {
 	cmd('[ "$(ls -A ' + config.remotePath + ')" ] && echo 1 || echo 0', data => {
 		if (!Number(data)) {
 			log('Removed existing files in ' + config.remotePath);
-			fs.readdirSync(directory).forEach(file => {
-				if (file[0] === '.') {
-					warn(file);
-					scpClient.scp(directory + file, scpInfo, function (err) {
-						if (err) {
-							error(err);
-						} else {
-							scpClient.scp(directory, scpInfo, function (err) {
-								if (err) {
-									error(err);
-								} else {
-									success('Reloaded!');
-									cb();
-								}
-							});
-						}
-					});
+			warn('Reloading...');
+			var begin = Date.now();
+			const dotFiles = fg.sync([directory + '**/.**']);
+			let uploadedDotFiles = [];
+			for (let file of dotFiles) {
+				scpClient.scp(file, scpInfo, function (err) {
+					if (err) {
+						error(err);
+					} else {
+						uploadedDotFiles.push(file);
+						done();
+					}
+				});
+			}
+			let dirUploaded = false;
+			scpClient.scp(directory, scpInfo, function (err) {
+				if (err) {
+					error(err);
+				} else {
+					dirUploaded = true;
+					done();
 				}
 			});
+			const done = () => {
+				if (dirUploaded && uploadedDotFiles.length === dotFiles.length) {
+					var end = Date.now();
+					var timeSpent = (end - begin) / 1000 + "secs";
+					success('Reloaded in ' + timeSpent + '!');
+					cb();
+				}
+			}
 		} else {
 			error('Failed to remove existing files on ' + config.remotePath);
 			cb();
