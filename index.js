@@ -86,48 +86,47 @@ function refreshDirectory(directory, cb) {
 		password: config.password,
 		path: config.remotePath
 	};
-	warn('Preparing to refresh...');
-	cmd('rm -rf ' + config.remotePath + '/*', data => {});
-	cmd('rm -rf ' + config.remotePath + '/.*', data => {}, false);
+	warn('Preparing to reload...');
 	cmd('[ "$(ls -A ' + config.remotePath + ')" ] && echo 1 || echo 0', data => {
-		if (!Number(data)) {
-			log('Removed existing files in ' + config.remotePath);
-			warn('Reloading...');
-			var begin = Date.now();
-			const dotFiles = fg.sync([directory + '**/.**']);
-			let uploadedDotFiles = [];
-			for (let file of dotFiles) {
-				scpClient.scp(file, scpInfo, function (err) {
-					if (err) {
-						error(err);
-					} else {
-						uploadedDotFiles.push(file);
-						done();
-					}
-				});
-			}
-			let dirUploaded = false;
-			scpClient.scp(directory, scpInfo, function (err) {
+		if (Number(data)) {
+			log('Removing contents of ' + config.remotePath);
+			cmd('rm -rf ' + config.remotePath, data => {});
+			cmd('mkdir ' + config.remotePath, data => {});
+		}
+	});
+	setTimeout(() => {
+		warn('Reloading...');
+		var begin = Date.now();
+		const dotFiles = fg.sync([directory + '**/.**']);
+		let uploadedDotFiles = [];
+		for (let file of dotFiles) {
+			scpClient.scp(file, scpInfo, function (err) {
 				if (err) {
 					error(err);
 				} else {
-					dirUploaded = true;
+					uploadedDotFiles.push(file);
 					done();
 				}
 			});
-			const done = () => {
-				if (dirUploaded && uploadedDotFiles.length === dotFiles.length) {
-					var end = Date.now();
-					var timeSpent = (end - begin) / 1000 + "secs";
-					success('Reloaded in ' + timeSpent + '!');
-					cb();
-				}
-			}
-		} else {
-			error('Failed to remove existing files on ' + config.remotePath);
-			cb();
 		}
-	});
+		let dirUploaded = false;
+		scpClient.scp(directory, scpInfo, function (err) {
+			if (err) {
+				error(err);
+			} else {
+				dirUploaded = true;
+				done();
+			}
+		});
+		const done = () => {
+			if (dirUploaded && uploadedDotFiles.length === dotFiles.length) {
+				var end = Date.now();
+				var timeSpent = (end - begin) / 1000 + "secs";
+				success('Reloaded in ' + timeSpent + '!');
+				cb();
+			}
+		}
+	}, 5000);
 }
 
 function watchAndDeploy(directory) {
@@ -172,23 +171,23 @@ exports.autoDeploy = function (directory, reload = false) {
 		directory += '/';
 	}
 	checkPermissions(() => {
-		setRemoteDirectory(() => {
-			if (reload) {
-				log('\x1b[1m' + 'EXIT NOW IF YOU DO NOT WANT TO RELOAD ' + config.remotePath);
-				rl.question(deployerTag + 'Press enter if you would like to continue.' + '\x1b[0m', (answer) => {
-					if (!answer.length) {
-						refreshDirectory(directory, function () {
-							watchAndDeploy(directory);
-						});
-					} else {
-						return;
-					}
-					rl.close();
-				});
-			} else {
-				watchAndDeploy(directory);
-			}
-		});
+		// setRemoteDirectory(() => {
+		if (reload) {
+			log('\x1b[1m' + 'EXIT NOW IF YOU DO NOT WANT TO RELOAD ' + config.remotePath);
+			rl.question(deployerTag + 'Press enter if you would like to continue.' + '\x1b[0m', (answer) => {
+				if (!answer.length) {
+					refreshDirectory(directory, function () {
+						watchAndDeploy(directory);
+					});
+				} else {
+					return;
+				}
+				rl.close();
+			});
+		} else {
+			watchAndDeploy(directory);
+		}
+		// });
 	});
 }
 
