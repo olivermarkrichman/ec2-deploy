@@ -1,3 +1,5 @@
+# DEPRECATED PACKAGE
+
 # EC2-Deploy
 
 This EC2-Deploy package makes it super easy to upload files to your AWS EC2 instance (or any SSH instance - only tested via AWS EC2). This package can accept a couple of simple commands which will then watch your directory and automatically send the files to the desired location on your server.
